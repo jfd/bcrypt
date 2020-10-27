@@ -1,1 +1,1 @@
-import * as BCrypt from "./BCrypt.mjs";
+export * as BCrypt from "./src/BCrypt.mjs";
