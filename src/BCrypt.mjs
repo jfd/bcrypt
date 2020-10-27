@@ -17,14 +17,14 @@ export const GENSALT_DEFAULT_LOG2_ROUNDS = 10;
 export const BLOWFISH_NUM_ROUNDS = 16;
 export const MAX_EXECUTION_TIME = 100;
 
-const P_ORIG = [
+const pOrig = [
     0x243f6a88, 0x85a308d3, 0x13198a2e, 0x03707344, 0xa4093822,
     0x299f31d0, 0x082efa98, 0xec4e6c89, 0x452821e6, 0x38d01377,
     0xbe5466cf, 0x34e90c6c, 0xc0ac29b7, 0xc97c50dd, 0x3f84d5b5,
     0xb5470917, 0x9216d5d9, 0x8979fb1b
 ];
 
-const S_ORIG = [
+const sOrig = [
     0xd1310ba6, 0x98dfb5ac, 0x2ffd72db, 0xd01adfb7, 0xb8e1afed,
     0x6a267e96, 0xba7c9045, 0xf12c7f99, 0x24a19947, 0xb3916cf7,
     0x0801f2e2, 0x858efc16, 0x636920d8, 0x71574e69, 0xa458fea3,
@@ -600,11 +600,11 @@ function internalCrypt(b, salt, rounds, callback, progressCallback) {
 
     //Use typed arrays when available - huge speedup!
     if (Int32Array) {
-        P = new Int32Array(P_ORIG);
-        S = new Int32Array(S_ORIG);
+        P = new Int32Array(pOrig);
+        S = new Int32Array(sOrig);
     } else {
-        P = P_ORIG.slice();
-        S = S_ORIG.slice();
+        P = pOrig.slice();
+        S = sOrig.slice();
     }
 
     internalEksKey(salt, b, P, S);
