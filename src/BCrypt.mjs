@@ -1,4 +1,7 @@
+import Crypto from "crypto";
+
 import * as Base64 from "./Base64.mjs";
+import * as Utf8 from "./Utf8.mjs";
 
 export {hhash};
 export {hashSync};
@@ -9,10 +12,10 @@ export {generateSaltSync};
 export {compare};
 export {compareSync};
 
-const BCRYPT_SALT_LEN = 16;
-const GENSALT_DEFAULT_LOG2_ROUNDS = 10;
-const BLOWFISH_NUM_ROUNDS = 16;
-const MAX_EXECUTION_TIME = 100;
+export const BCRYPT_SALT_LEN = 16;
+export const GENSALT_DEFAULT_LOG2_ROUNDS = 10;
+export const BLOWFISH_NUM_ROUNDS = 16;
+export const MAX_EXECUTION_TIME = 100;
 
 const P_ORIG = [
     0x243f6a88, 0x85a308d3, 0x13198a2e, 0x03707344, 0xa4093822,
@@ -236,39 +239,36 @@ const C_ORIG = [
 
 
 /// Synchronously generates a salt.
-function generateSaltSync(rounds, seed_length) {
-    rounds = rounds || GENSALT_DEFAULT_LOG2_ROUNDS;
-    if (typeof rounds !== 'number')
-        throw Error("Illegal arguments: "+(typeof rounds)+", "+(typeof seed_length));
-    if (rounds < 4)
+function generateSaltSync(rounds=GENSALT_DEFAULT_LOG2_ROUNDS) {
+    if (typeof rounds !== "number") {
+        throw Error(`"Illegal arguments: ${typeof rounds}`);
+    }
+
+    if (rounds < 4) {
         rounds = 4;
-    else if (rounds > 31)
+    } else if (rounds > 31) {
         rounds = 31;
-    var salt = [];
+    }
+
+    const salt = [];
     salt.push("$2a$");
-    if (rounds < 10)
+
+    if (rounds < 10) {
         salt.push("0");
+    }
+
     salt.push(rounds.toString());
     salt.push('$');
     salt.push(Base64.encode(internalRandom(BCRYPT_SALT_LEN), BCRYPT_SALT_LEN));
+
     return salt.join('');
 }
 
 /// Asynchronously generates a salt.
-function generateSalt(rounds, seed_length, callback) {
-    if (typeof seed_length === 'function')
-        callback = seed_length,
-        seed_length = undefined; // Not supported.
-    if (typeof rounds === 'function')
-        callback = rounds,
-        rounds = undefined;
-    if (typeof rounds === 'undefined')
-        rounds = GENSALT_DEFAULT_LOG2_ROUNDS;
-    else if (typeof rounds !== 'number')
-        throw Error("illegal arguments: "+(typeof rounds));
+function generateSalt(rounds=GENSALT_DEFAULT_LOG2_ROUNDS) {
 
     function _async(callback) {
-        nextTick(function() { // Pretty thin, but salting is fast enough
+        process.nextTick(function() {
             try {
                 callback(null, generateSaltSync(rounds));
             } catch (err) {
@@ -277,20 +277,15 @@ function generateSalt(rounds, seed_length, callback) {
         });
     }
 
-    if (callback) {
-        if (typeof callback !== 'function')
-            throw Error("Illegal callback: "+typeof(callback));
-        _async(callback);
-    } else
-        return new Promise(function(resolve, reject) {
-            _async(function(err, res) {
-                if (err) {
-                    reject(err);
-                    return;
-                }
-                resolve(res);
-            });
+    return new Promise(function(resolve, reject) {
+        _async(function(err, res) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(res);
         });
+    });
 }
 
 // Asynchronously generates a hash for the given string.
@@ -325,14 +320,22 @@ function hhash(s, salt, callback, progressCallback) {
 
 
 /// Synchronously generates a hash for the given string.
-function hashSync(str, salt=GENSALT_DEFAULT_LOG2_ROUNDS) {
+function hashSync(str, saltOrRounds) {
     if (typeof str !== "string") {
-        throw new ArgumentException(`Illegal argument: "${typeof str}`);
+        throw new TypeError(`Illegal argument: "${typeof str}`);
     }
 
-    const salt2 = generateSaltSync(salt);
+    let salt = saltOrRounds;
 
-    return internalHash(str, salt2);
+    if (typeof saltOrRounds === "number") {
+        salt = generateSaltSync(saltOrRounds);
+    }
+
+    if (typeof salt !== "string") {
+        throw new TypeError(`Illegal argument: "${typeof salt}`);
+    }
+
+    return internalHash(str, salt);
 }
 
 
@@ -384,7 +387,7 @@ function compare(s, hash, callback, progressCallback) {
 /// Gets the number of rounds used to encrypt the specified hash.
 function getRounds(hash) {
     if (typeof hash !== "string") {
-        throw ArgumentException("Illegal arguments: " + (typeof hash));
+        throw new TypeError("Illegal arguments: " + (typeof hash));
     }
 
     return parseInt(hash.split("$")[2], 10);
@@ -406,7 +409,9 @@ function getSalt(hash) {
 // Interals
 
 function streamToWword(data, offp) {
-    for (let i = 0, word = 0; i < 4; ++i) {
+    let word = 0;
+
+    for (let i = 0; i < 4; ++i) {
         word = (word << 8) | (data[offp] & 0xff);
         offp = (offp + 1) % data.length;
     }
@@ -602,7 +607,7 @@ function internalCrypt(b, salt, rounds, callback, progressCallback) {
         S = S_ORIG.slice();
     }
 
-    internalEksKe(salt, b, P, S);
+    internalEksKey(salt, b, P, S);
 
     /**
      * Calcualtes the next round.
@@ -714,7 +719,7 @@ function internalHash(s, salt, callback, progressCallback) {
 
     s += minor >= 'a' ? "\x00" : "";
 
-    const passwordb = stringToBytes(s);
+    const passwordb = Utf8.toByteArray(s);
     const saltb = Base64.decode(realSalt, BCRYPT_SALT_LEN);
 
     /**
