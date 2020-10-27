@@ -299,7 +299,7 @@ function hhash(s, salt, callback, progressCallback) {
         else if (typeof s === 'string' && typeof salt === 'string')
             internalHash(s, salt, callback, progressCallback);
         else
-            nextTick(callback.bind(this, Error("Illegal arguments: "+(typeof s)+', '+(typeof salt))));
+            process.nextTick(callback.bind(this, Error("Illegal arguments: "+(typeof s)+', '+(typeof salt))));
     }
 
     if (callback) {
@@ -332,7 +332,7 @@ function hashSync(str, saltOrRounds) {
     }
 
     if (typeof salt !== "string") {
-        throw new TypeError(`Illegal argument: "${typeof salt}`);
+        salt = generateSaltSync(GENSALT_DEFAULT_LOG2_ROUNDS);
     }
 
     return internalHash(str, salt);
@@ -349,17 +349,19 @@ function compareSync(s, hash) {
 }
 
 /// Asynchronously compares the given data against the given hash.
-function compare(s, hash, callback, progressCallback) {
+function compare(s, hash, progressCallback) {
 
     function _async(callback) {
         if (typeof s !== "string" || typeof hash !== "string") {
-            nextTick(callback.bind(this, Error("Illegal arguments: "+(typeof s)+', '+(typeof hash))));
+            process.nextTick(callback.bind(this, Error("Illegal arguments: "+(typeof s)+', '+(typeof hash))));
             return;
         }
+
         if (hash.length !== 60) {
-            nextTick(callback.bind(this, null, false));
+            process.nextTick(callback.bind(this, null, false));
             return;
         }
+
         hhash(s, hash.substr(0, 29), function(err, comp) {
             if (err)
                 callback(err);
@@ -368,20 +370,15 @@ function compare(s, hash, callback, progressCallback) {
         }, progressCallback);
     }
 
-    if (callback) {
-        if (typeof callback !== 'function')
-            throw Error("Illegal callback: "+typeof(callback));
-        _async(callback);
-    } else
-        return new Promise(function(resolve, reject) {
-            _async(function(err, res) {
-                if (err) {
-                    reject(err);
-                    return;
-                }
-                resolve(res);
-            });
+    return new Promise(function(resolve, reject) {
+        _async(function(err, res) {
+            if (err) {
+                return reject(err);
+            }
+
+            resolve(res);
         });
+    });
 };
 
 /// Gets the number of rounds used to encrypt the specified hash.
@@ -581,7 +578,7 @@ function internalCrypt(b, salt, rounds, callback, progressCallback) {
     if (rounds < 4 || rounds > 31) {
         err = Error("Illegal number of rounds (4-31): "+rounds);
         if (callback) {
-            nextTick(callback.bind(this, err));
+            process.nextTick(callback.bind(this, err));
             return;
         } else
             throw err;
@@ -589,7 +586,7 @@ function internalCrypt(b, salt, rounds, callback, progressCallback) {
     if (salt.length !== BCRYPT_SALT_LEN) {
         err =Error("Illegal salt length: "+salt.length+" != "+BCRYPT_SALT_LEN);
         if (callback) {
-            nextTick(callback.bind(this, err));
+            process.nextTick(callback.bind(this, err));
             return;
         } else
             throw err;
@@ -643,7 +640,7 @@ function internalCrypt(b, salt, rounds, callback, progressCallback) {
                 return ret;
         }
         if (callback)
-            nextTick(next);
+            process.nextTick(next);
     }
 
     // Async
@@ -666,7 +663,7 @@ function internalHash(s, salt, callback, progressCallback) {
     if (typeof s !== 'string' || typeof salt !== 'string') {
         err = Error("Invalid string / salt: Not a string");
         if (callback) {
-            nextTick(callback.bind(this, err));
+            process.nextTick(callback.bind(this, err));
             return;
         }
         else
@@ -680,7 +677,7 @@ function internalHash(s, salt, callback, progressCallback) {
         err = Error("Invalid salt version: "+salt.substring(0,2));
 
         if (callback) {
-            nextTick(callback.bind(this, err));
+            process.nextTick(callback.bind(this, err));
             return;
         }
         else
@@ -694,7 +691,7 @@ function internalHash(s, salt, callback, progressCallback) {
         if ((minor !== 'a' && minor !== 'b' && minor !== 'y') || salt.charAt(3) !== '$') {
             err = Error("Invalid salt revision: "+salt.substring(2,4));
             if (callback) {
-                nextTick(callback.bind(this, err));
+                process.nextTick(callback.bind(this, err));
                 return;
             } else
                 throw err;
@@ -706,7 +703,7 @@ function internalHash(s, salt, callback, progressCallback) {
     if (salt.charAt(offset + 2) > '$') {
         err = Error("Missing salt rounds");
         if (callback) {
-            nextTick(callback.bind(this, err));
+            process.nextTick(callback.bind(this, err));
             return;
         } else
             throw err;
